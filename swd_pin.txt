@@ -1,0 +1,8 @@
+SWD
+
+robot
+
+white 	- 3,3V
+purple 	- 2 pin
+blue  	- 3 pin
+grey 	- 4 pin	
