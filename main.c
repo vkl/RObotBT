@@ -257,25 +257,25 @@ void stop(void)
 
 void move()
 {
-	if ((drv1 >= MIDPWM) && (drv1 <= MAXPWM))
-	{
-		TIM_SetCompare2(TIM4, drv1 - MIDPWM);
-		TIM_SetCompare1(TIM4, MINPWM);
-	}
-	else if ((drv1 >= MINPWM) && (drv1 < MIDPWM))
-	{
-		TIM_SetCompare2(TIM4, MINPWM);
-		TIM_SetCompare1(TIM4, (drv1 - MIDPWM) * -1);
-	}
 	if ((drv2 >= MIDPWM) && (drv2 <= MAXPWM))
 	{
-		TIM_SetCompare4(TIM4, drv2 - MIDPWM);
-		TIM_SetCompare3(TIM4, MINPWM);
+		TIM_SetCompare1(TIM4, drv2 - MIDPWM);
+		TIM_SetCompare2(TIM4, MINPWM);
 	}
 	else if ((drv2 >= MINPWM) && (drv2 < MIDPWM))
 	{
+		TIM_SetCompare1(TIM4, MINPWM);
+		TIM_SetCompare2(TIM4, (drv2 - MIDPWM) * -1);
+	}
+	if ((drv1 >= MIDPWM) && (drv1 <= MAXPWM))
+	{
+		TIM_SetCompare3(TIM4, drv1 - MIDPWM);
 		TIM_SetCompare4(TIM4, MINPWM);
-		TIM_SetCompare3(TIM4, (drv2 - MIDPWM) * -1);
+	}
+	else if ((drv1 >= MINPWM) && (drv1 < MIDPWM))
+	{
+		TIM_SetCompare3(TIM4, MINPWM);
+		TIM_SetCompare4(TIM4, (drv1 - MIDPWM) * -1);
 	}
 }
 
