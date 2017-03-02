@@ -3,27 +3,8 @@
 #include "usart_rxtx.h"
 #include "hwdrv.h"
 
-#define NUM 5
+#define NUM 10
 #define FAILURES 4
-
-#define AUTO	  ((0x51 << 8) | 0x52) /* the command is QR */
-#define FORWARD	  ((0x46 << 8) | 0x52) /* the command is FR */
-#define BACK 	  ((0x42 << 8) | 0x4B) /* the command is BK */
-#define LEFT	  ((0x4C << 8) | 0x46) /* the command is LF */
-#define RIGHT 	  ((0x52 << 8) | 0x54) /* the command is RT */
-#define STOP 	  ((0x53 << 8) | 0x54) /* the command is ST */
-#define OK	      ((0x4F << 8) | 0x4B) /* the command is OK */
-#define MOVE	  ((0x4D << 8) | 0x56) /* the command is MV */
-
-/* Bit definition for status register */
-#define FORWARD_Status	0
-#define BACK_Status		1
-#define LEFT_Status		2
-#define RIGHT_Status	3
-#define MOVE_Status		4
-#define WALL_Status		5
-#define AUTO_Status		6
-#define CONNOK  		7
 
 #define STARTMARKER		0x81
 #define STOPMARKER 		0x8F
@@ -41,8 +22,8 @@ __IO uint8_t p = 0;
 char cmd[NUM] = { '\0' };
 uint8_t response[NUM] = { '\0' };
 __IO uint8_t flg = 0;
-__IO int8_t drv1 = 0;
-__IO int8_t drv2 = 0;
+__IO uint8_t drv1 = MIDPWM;
+__IO uint8_t drv2 = MIDPWM;
 
 GPIO_InitTypeDef gpio_sensors;
 
@@ -158,7 +139,7 @@ void SysTick_Handler(void)
     
     SendResponse();
 
-	if (((1 << CONNOK) & status) == 0)
+	if ((Status_OK & status) == 0)
 		count++;
 
 	if (count >= FAILURES)
@@ -169,11 +150,9 @@ void SysTick_Handler(void)
 		GPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_SET);
 	}
 
-	status &= ~(1 << CONNOK);
-
-	if (status & (1 << AUTO_Status))
+	if (status & Status_AUTO)
 	{
-		if (status & (1 << WALL_Status))
+		if (status & Status_WALL)
 		{
 			if (detour[0].ticks > 0)
 			{
@@ -188,9 +167,10 @@ void SysTick_Handler(void)
 			else
 			{
 				stop();
-				status &= ~(1 << WALL_Status);
+				status &= ~Status_WALL;
                 /* restore the previous command */
                 status_handler();
+                move();
 			}
 		}
 		else
@@ -281,81 +261,54 @@ void move()
 
 void status_handler(void)
 {
-    uint8_t movestatus = 0x0F & status;
-    switch (movestatus)
+    switch (0x0F & status)
     {
-    case (1 << FORWARD_Status):
-        forward();
-        break;
-    case (1 << BACK_Status):
-        backward();
-        break;
-    case (1 << LEFT_Status):
-        left();
-        break;
-    case (1 << RIGHT_Status):
-        right();
-        break;
+        case Status_FORWARD:
+            drv1 = MAXPWM; drv2 = MAXPWM;
+            break;
+        case Status_BACK:
+            drv1 = MINPWM; drv2 = MINPWM;
+            break;
+        case Status_LEFT:
+            drv1 = MINPWM; drv2 = MAXPWM;
+            break;
+        case Status_RIGHT:
+            drv2 = MINPWM; drv1 = MAXPWM;
+            break;
+        case Status_SLEFT:
+            drv1 = SPWM; drv2 = MAXPWM;
+            break;
+        case Status_SRIGHT:
+            drv2 = SPWM; drv1 = MAXPWM;
+            break;
+        case Status_SBLEFT:
+            drv1 = SBPWM; drv2 = MINPWM;
+            break;
+        case Status_SBRIGHT:
+            drv2 = SBPWM; drv1 = MINPWM;
+            break;
+        default:
+            drv1 = MIDPWM; drv2 = MIDPWM;
+            break;
     }
 }
 
 void cmd_handler(char *cmd)
 {
-	uint16_t c;
-	c = (uint16_t)(cmd[0] << 8) | cmd[1];
-	status |= (1 << CONNOK);
+	status = (uint8_t)cmd[0];
 	count = 0;
-	switch (c)
-	{
-	case MOVE:
-		if ((status & (1 << AUTO_Status)) == 0)
-		{
-			status &= 0xF0;
-			status |= (1 << MOVE_Status);
-			drv1 = (int8_t)cmd[2];
-			drv2 = (int8_t)cmd[3];
-			move();
-		}
-		break;
-	case FORWARD:
-		status &= 0xF0;
-		status |= (1 << FORWARD_Status);
-		forward();
-		break;
-	case BACK:
-		status &= 0xF0;
-		status |= (1 << BACK_Status);
-		backward();
-		break;
-	case LEFT:
-		status &= 0xF0;
-		status |= (1 << LEFT_Status);
-		left();
-		break;
-	case RIGHT:
-		status &= 0xF0;
-		status |= (1 << RIGHT_Status);
-		right();
-		break;
-	case STOP:
-		status &= 0xF0;
-		stop();
-		break;
-	case AUTO:
-		if (status & (1 << AUTO_Status))
-		{
-			status &= ~(1 << AUTO_Status);
-			GPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_SET);
-		}
-		else
-		{
-			status |= (1 << AUTO_Status);
-			GPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_RESET);
-		}
-		break;
-	case OK:
-		break;
-	}
+    if  (Status_AUTO & status)
+    {
+        GPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_SET);
+        status_handler();
+    }
+    else
+    {
+        GPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_RESET);
+        drv1 = (uint8_t)cmd[1];
+        drv2 = (uint8_t)cmd[2];
+    }
+    move();
 }
 
 void TIM4_Init()
@@ -422,7 +375,7 @@ void sensor_handler(void)
     if ((count2 < 0xFF) | (count1 < 0xFF))
     {
         stop();
-        status |= (1 << WALL_Status);
+        status |= Status_WALL;
         detour[0].func = &backward;
         detour[0].ticks = 10;
         if (count2 > count1)
@@ -436,5 +389,4 @@ void sensor_handler(void)
             detour[1].ticks = 5;
         }
     }
-    //return (uint16_t)((count2 << 8) | count1);
 }
