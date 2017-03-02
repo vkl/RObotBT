@@ -222,3 +222,16 @@ pip-log.txt
 
 *.o
 *.d
+*.lst
+*.inp
+*.crf
+*.htm
+Objects/ExtDll.iex
+*.map
+Objects/robotbt.axf
+*.dep
+robotbt.uvoptx
+*.uvoptx
+robotbt.uvprojx
+*.kladov
+Objects/robotbt.lnp
